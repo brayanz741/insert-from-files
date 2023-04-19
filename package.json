@@ -1,0 +1,24 @@
+{
+  "name": "insert-from-files",
+  "version": "1.0.0",
+  "description": "Repositorio para leer archivos de texto y leer valores únicos de códigos dentro del archivo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brayanz741/insert-from-files.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/brayanz741/insert-from-files/issues"
+  },
+  "homepage": "https://github.com/brayanz741/insert-from-files#readme",
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "mysql2": "^3.2.3"
+  }
+}
