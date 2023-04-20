@@ -7,6 +7,7 @@ const ignoreFile = ['.gitignore'];
 const fieldDelimiter = ',';
 const lineDelimiter = '\n';
 const recordsByInsert = 20000;
+const tableName = 'codes';
 const connectionData = {
 	host: process.env.HOSTDB,
 	port: process.env.PORTDB,
@@ -17,33 +18,29 @@ const connectionData = {
 
 async function main() {
 	console.log('Obteniendo Archivos');
-	let files = await getFiles(folderPath);
+	const files = await getFiles(folderPath);
 	for (const file of files) {
-		console.log('Obteniendo los datos del archivo ', file);
-		let data = await getDataFromFile(file);
+		console.time(file);
+		const data = await getDataFromFile(file);
 		if (data.length < 1) continue;
-		console.log('Extrayendo solo los valores unicos de códigos');
-		let uniqueCodes = await getUniqueValues(data, 'CAMPO', 'name');
+		const uniqueCodes = await getUniqueValues(data, 'CAMPO', 'name');
 		const connection = await createConnection();
-		console.log(`Insertando ${uniqueCodes.length} Registros, del archivo ${file}`);
-		await insertMultipleRecordsInBatches(connection, 'codes', uniqueCodes, recordsByInsert);
+		await insertMultipleRecordsInBatches(connection, uniqueCodes, recordsByInsert);
+		connection.end();
+		console.timeEnd(file);
 	}
 	process.exit(0);
 }
 
 async function getFiles(path) {
-	return (fileList = fs.readdirSync(path));
-}
-
-async function createFile(pathFile, data) {
-	fs.writeFileSync(pathFile, data);
+	return fs.promises.readdir(path);
 }
 
 async function getDataFromFile(file) {
 	if (ignoreFile.includes(file)) return [];
-	let content = fs.readFileSync(folderPath + file, { encoding: 'utf8', flag: 'r' });
-	let lines = content.trim().split(lineDelimiter);
-	const headers = lines.shift().split(fieldDelimiter); // Obtener las cabeceras del archivo
+	const content = await fs.promises.readFile(folderPath + file, { encoding: 'utf8', flag: 'r' });
+	const lines = content.trim().split(lineDelimiter);
+	const headers = lines.shift().split(fieldDelimiter);
 	const obj = lines.map((line) => {
 		const values = line.split(fieldDelimiter);
 		return headers.reduce((obj, header, i) => {
@@ -55,24 +52,21 @@ async function getDataFromFile(file) {
 }
 
 async function getUniqueValues(objects, property, newPropertyName) {
-	const values = objects.map((obj) => obj[property]);
-	const uniqueValues = values.filter((value, index) => {
-		return values.indexOf(value) === index;
-	});
-	const result = uniqueValues.map((value) => {
+	const uniqueValues = new Set(objects.map((obj) => obj[property]));
+	const result = [];
+	for (const value of uniqueValues) {
 		const obj = {};
 		obj[newPropertyName] = value;
-		return obj;
-	});
+		result.push(obj);
+	}
 	return result;
 }
 
 async function createConnection() {
-	const connection = await mysql.createPool(connectionData);
-	return connection;
+	return mysql.createPool(connectionData);
 }
 
-async function insertMultipleRecordsInBatches(connection, tableName, data, segmentSize) {
+async function insertMultipleRecordsInBatches(connection, data, segmentSize) {
 	const segmentCount = Math.ceil(data.length / segmentSize);
 	let insertedRows = 0;
 
@@ -83,14 +77,13 @@ async function insertMultipleRecordsInBatches(connection, tableName, data, segme
 			.map(
 				(item) =>
 					`(${Object.values(item)
-						.map((val) => `'${val}'`)
+						.map((val) => mysql.escape(val))
 						.join(', ')})`
 			)
 			.join(', ');
 		const query = `INSERT INTO ${tableName} (${keys}) VALUES ${values}`;
-
 		const result = await connection.query(query);
-		insertedRows += result.affectedRows;
+		insertedRows += result[0].affectedRows;
 	}
 
 	return insertedRows;
